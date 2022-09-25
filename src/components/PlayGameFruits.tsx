@@ -1,4 +1,4 @@
-import type { typeDataFruits } from "./dataFruits"
+import type { typeDataFruits } from "../dataFruits"
 import React, { useState, ReactElement } from "react"
 import SpeechRecognition, {
   useSpeechRecognition,
@@ -6,7 +6,7 @@ import SpeechRecognition, {
 
 function PlayGameFruits(props: {
   dataFruits: typeDataFruits[]
-  setDataF: Func
+  setDataF: any
 }): ReactElement {
   const [message, setMessage] = useState<string>("")
   const [classBorder, setClassBorder] = useState<string>("")
@@ -17,7 +17,7 @@ function PlayGameFruits(props: {
   const commands = [
     {
       command: props.dataFruits.map((item: typeDataFruits) => item.nama),
-      callback: (command) => {
+      callback: (command: string) => {
         let temp = props.dataFruits.filter((item: typeDataFruits) => {
           if (command === item.nama) {
             setMessage(`Best matching command: ${command}`)
@@ -30,20 +30,20 @@ function PlayGameFruits(props: {
           }
           return item
         })
-        setDataF([...temp])
+        props.setDataF([...temp])
       },
       isFuzzyMatch: true,
       fuzzyMatchingThreshold: 0.2,
       bestMatchOnly: true,
     },
-    {
-      command: "reset",
-      callback: ({ resetTranscript }) => resetTranscript(),
-    },
   ]
 
-  const { transcript, listening, browserSupportsSpeechRecognition } =
-    useSpeechRecognition({ commands })
+  const {
+    transcript,
+    listening,
+    browserSupportsSpeechRecognition,
+    resetTranscript,
+  } = useSpeechRecognition({ commands })
 
   if (!browserSupportsSpeechRecognition) {
     return <div>Harus Menggunakan Browser Google Chrome</div>
@@ -64,6 +64,7 @@ function PlayGameFruits(props: {
       </div>
       <div>
         <p>Microphone: {listening ? "on" : "off"}</p>
+        <button onClick={() => resetTranscript()}>Reset Transcript</button>{"  "}
         <button
           onTouchStart={startListening}
           onMouseDown={startListening}
