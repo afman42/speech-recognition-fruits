@@ -59,7 +59,10 @@ function PlayGameFruits(props: {
             key={index}
             className={`boxItem ${seIndex === index ? "boxBorder" : ""}`}
           >
-            <img src={item.gambar} style={{ width: "100px", height: "100px" }} />
+            <img
+              src={item.gambar}
+              style={{ width: "100px", height: "100px" }}
+            />
             <h4>{item.nama}</h4>
           </div>
         ))}
