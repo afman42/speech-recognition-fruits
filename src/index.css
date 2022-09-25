@@ -1,0 +1,25 @@
+.box {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+}
+
+.boxRow {
+  display: flex;
+  flex-direction: row;
+}
+
+.boxItem {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  margin-right: 20px;
+}
+
+.boxBorder {
+  border-width: 2px;
+  border-style: dashed;
+  border-color: red;
+}
