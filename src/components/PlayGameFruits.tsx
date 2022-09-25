@@ -9,7 +9,7 @@ function PlayGameFruits(props: {
   setDataF: any
 }): ReactElement {
   const [message, setMessage] = useState<string>("")
-  const [classBorder, setClassBorder] = useState<string>("")
+  const [seIndex, setSeIndex] = useState<number | null>(null)
 
   const startListening = () =>
     SpeechRecognition.startListening({ continuous: true, language: "id" })
@@ -18,18 +18,20 @@ function PlayGameFruits(props: {
     {
       command: props.dataFruits.map((item: typeDataFruits) => item.nama),
       callback: (command: string) => {
-        let temp = props.dataFruits.filter((item: typeDataFruits) => {
-          if (command === item.nama) {
-            setMessage(`Best matching command: ${command}`)
-            setClassBorder("boxBorder")
-            item.seleksi = true
-            setTimeout(() => {
-              item.seleksi = false
-              setClassBorder("")
-            }, 1000)
+        let temp = props.dataFruits.filter(
+          (item: typeDataFruits, index: number) => {
+            if (command === item.nama) {
+              setSeIndex(index)
+              setMessage(`Best matching command: ${command}`)
+              item.seleksi = true
+              setTimeout(() => {
+                item.seleksi = false
+                setSeIndex(null)
+              }, 1000)
+            }
+            return item
           }
-          return item
-        })
+        )
         props.setDataF([...temp])
       },
       isFuzzyMatch: true,
@@ -53,18 +55,19 @@ function PlayGameFruits(props: {
     <div>
       <div className="boxRow">
         {props.dataFruits.map((item: typeDataFruits, index: number) => (
-          <div key={index} className={"boxItem " + classBorder}>
-            <img
-              src={item.gambar}
-              style={{ width: "100px", height: "100px" }}
-            />
+          <div
+            key={index}
+            className={`boxItem ${seIndex === index ? "boxBorder" : ""}`}
+          >
+            <img src={item.gambar} style={{ width: "50px", height: "50px" }} />
             <h4>{item.nama}</h4>
           </div>
         ))}
       </div>
       <div>
         <p>Microphone: {listening ? "on" : "off"}</p>
-        <button onClick={() => resetTranscript()}>Reset Transcript</button>{"  "}
+        <button onClick={() => resetTranscript()}>Reset Transcript</button>
+        {"  "}
         <button
           onTouchStart={startListening}
           onMouseDown={startListening}
