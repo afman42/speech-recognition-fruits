@@ -71,14 +71,25 @@ function PlayGameFruits(props: {
         <p>Microphone: {listening ? "on" : "off"}</p>
         <button onClick={() => resetTranscript()}>Reset Transcript</button>
         {"  "}
-        <button
-          onTouchStart={startListening}
-          onMouseDown={startListening}
-          onTouchEnd={SpeechRecognition.stopListening}
-          onMouseUp={SpeechRecognition.stopListening}
-        >
-          Hold to talk
-        </button>
+        {window.innerWidth <= 600 ? (
+          <button
+            onTouchStart={startListening}
+            onMouseDown={startListening}
+            onTouchEnd={SpeechRecognition.stopListening}
+            onMouseUp={SpeechRecognition.stopListening}
+          >
+            Hold to talk
+          </button>
+        ) : (
+          <button
+            onClick={startListening}
+            onMouseDown={startListening}
+            onDoubleClick={SpeechRecognition.stopListening}
+            onMouseUp={SpeechRecognition.stopListening}
+          >
+            Hold to talk
+          </button>
+        )}
         <p>{transcript}</p>
         <p>{message}</p>
       </div>
