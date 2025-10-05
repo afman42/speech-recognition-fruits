@@ -1,38 +1,66 @@
 import type { typeDataFruits } from "../dataFruits"
-import React, { useState, ReactElement } from "react"
+import React, { useState, ReactElement, useRef, useEffect } from "react"
 import SpeechRecognition, {
   useSpeechRecognition,
 } from "react-speech-recognition"
 
 function PlayGameFruits(props: {
   dataFruits: typeDataFruits[]
-  setDataF: any
+  setDataF: React.Dispatch<React.SetStateAction<typeDataFruits[]>>
 }): ReactElement {
   const [message, setMessage] = useState<string>("")
   const [seIndex, setSeIndex] = useState<number | null>(null)
+  const resetTimeoutRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (resetTimeoutRef.current !== null) {
+        window.clearTimeout(resetTimeoutRef.current)
+      }
+    }
+  }, [])
 
   const startListening = () =>
-    SpeechRecognition.startListening({ continuous: true, language: "id" })
+    SpeechRecognition.startListening({ continuous: true, language: "id-ID" })
+  const stopListening = () => {
+    SpeechRecognition.stopListening()
+  }
 
   const commands = [
     {
       command: props.dataFruits.map((item: typeDataFruits) => item.nama),
       callback: (command: string) => {
-        let temp = props.dataFruits.filter(
-          (item: typeDataFruits, index: number) => {
-            if (command === item.nama) {
-              setSeIndex(index)
-              setMessage(`Best matching command: ${command}`)
-              item.seleksi = true
-              setTimeout(() => {
-                item.seleksi = false
-                setSeIndex(null)
-              }, 1000)
-            }
-            return item
-          }
+        const matchedIndex = props.dataFruits.findIndex(
+          (item: typeDataFruits) => command === item.nama
         )
-        props.setDataF([...temp])
+
+        if (matchedIndex === -1) {
+          return
+        }
+
+        setSeIndex(matchedIndex)
+        setMessage(`Best matching command: ${command}`)
+
+        props.setDataF((prev) =>
+          prev.map((item, index) => ({
+            ...item,
+            seleksi: index === matchedIndex,
+          }))
+        )
+
+        if (resetTimeoutRef.current !== null) {
+          window.clearTimeout(resetTimeoutRef.current)
+        }
+
+        resetTimeoutRef.current = window.setTimeout(() => {
+          setSeIndex(null)
+          props.setDataF((prev) =>
+            prev.map((item) => ({
+              ...item,
+              seleksi: false,
+            }))
+          )
+        }, 1000)
       },
       isFuzzyMatch: true,
       fuzzyMatchingThreshold: 0.2,
@@ -74,18 +102,17 @@ function PlayGameFruits(props: {
         {window.innerWidth <= 600 ? (
           <button
             onTouchStart={startListening}
-            onMouseDown={startListening}
             onTouchEnd={SpeechRecognition.stopListening}
             onMouseUp={SpeechRecognition.stopListening}
+            onTouchCancel={stopListening}
           >
             Hold to talk
           </button>
         ) : (
           <button
-            onClick={startListening}
             onMouseDown={startListening}
-            onDoubleClick={SpeechRecognition.stopListening}
-            onMouseUp={SpeechRecognition.stopListening}
+            onMouseUp={stopListening}
+            onMouseLeave={stopListening}
           >
             Hold to talk
           </button>
