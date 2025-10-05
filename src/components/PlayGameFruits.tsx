@@ -11,6 +11,7 @@ function PlayGameFruits(props: {
   const [message, setMessage] = useState<string>("")
   const [seIndex, setSeIndex] = useState<number | null>(null)
   const resetTimeoutRef = useRef<number | null>(null)
+  const startListeningPromiseRef = useRef<Promise<void> | null>(null)
 
   useEffect(() => {
     return () => {
@@ -20,10 +21,42 @@ function PlayGameFruits(props: {
     }
   }, [])
 
-  const startListening = () =>
-    SpeechRecognition.startListening({ continuous: true, language: "id-ID" })
-  const stopListening = () => {
-    SpeechRecognition.stopListening()
+  const startListening = () => {
+    if (listening || startListeningPromiseRef.current) {
+      return
+    }
+
+    const startPromise = SpeechRecognition.startListening({
+      continuous: true,
+      language: "id-ID",
+    })
+      .catch(() => {
+        startListeningPromiseRef.current = null
+        setMessage("Tidak dapat memulai mikrofon. Periksa perizinan browser.")
+      })
+      .finally(() => {
+        startListeningPromiseRef.current = null
+      })
+
+    startListeningPromiseRef.current = startPromise
+  }
+  const stopListening = async () => {
+    const pendingStart = startListeningPromiseRef.current
+
+    if (pendingStart) {
+      try {
+        await pendingStart
+      } catch {}
+    }
+
+    startListeningPromiseRef.current = null
+
+    try {
+      await SpeechRecognition.stopListening()
+    } catch {}
+  }
+  const handleStopListening = () => {
+    void stopListening()
   }
 
   const commands = [
@@ -102,17 +135,17 @@ function PlayGameFruits(props: {
         {window.innerWidth <= 600 ? (
           <button
             onTouchStart={startListening}
-            onTouchEnd={SpeechRecognition.stopListening}
-            onMouseUp={SpeechRecognition.stopListening}
-            onTouchCancel={stopListening}
+            onTouchEnd={handleStopListening}
+            onMouseUp={handleStopListening}
+            onTouchCancel={handleStopListening}
           >
             Hold to talk
           </button>
         ) : (
           <button
             onMouseDown={startListening}
-            onMouseUp={stopListening}
-            onMouseLeave={stopListening}
+            onMouseUp={handleStopListening}
+            onMouseLeave={handleStopListening}
           >
             Hold to talk
           </button>
