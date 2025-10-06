@@ -1,131 +1,39 @@
 import type { typeDataFruits } from "../dataFruits"
-import React, { useState, ReactElement, useRef, useEffect, useCallback } from "react"
-import SpeechRecognition, {
-  useSpeechRecognition,
-} from "react-speech-recognition"
-
-type ErrorType = 'permission' | 'network' | 'timeout' | 'not-supported' | 'unknown'
+import React, { ReactElement, useRef, useCallback, useState, useEffect } from "react"
+import { useSpeechRecognition } from "react-speech-recognition"
+import { useSpeechRecognitionManager } from "../hooks/useSpeechRecognitionManager"
+import { useIsMobile } from "../hooks/useIsMobile"
+import { 
+  DEFAULT_LANGUAGE,
+  SELECTION_RESET_TIMEOUT,
+  FUZZY_MATCH_THRESHOLD,
+  ERROR_MESSAGES,
+  BUTTON_LABELS,
+  UI_MESSAGES
+} from "../constants"
 
 interface PlayGameFruitsProps {
   dataFruits: typeDataFruits[]
-  setDataF: React.Dispatch<React.SetStateAction<typeDataFruits[]>>
+  setDataFruits: React.Dispatch<React.SetStateAction<typeDataFruits[]>>
   language?: string
 }
 
 function PlayGameFruits(props: PlayGameFruitsProps): ReactElement {
-  const [message, setMessage] = useState<string>("")
-  const [errorType, setErrorType] = useState<ErrorType | null>(null)
-  const [isLoading, setIsLoading] = useState<boolean>(false)
-  const [seIndex, setSeIndex] = useState<number | null>(null)
-  const [isMobile, setIsMobile] = useState<boolean>(false)
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
+  const [bestMatchMessage, setBestMatchMessage] = useState<string>("")
   const resetTimeoutRef = useRef<number | null>(null)
-  const startListeningPromiseRef = useRef<Promise<void> | null>(null)
-  const { language = "id-ID" } = props
-
-  // Handle window resize for mobile detection
+  const { language = DEFAULT_LANGUAGE } = props
+  
+  const isMobile = useIsMobile()
+  
+  // Cleanup effect for timeout
   useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth <= 600)
-    }
-    
-    handleResize() // Set initial value
-    window.addEventListener('resize', handleResize)
-    
     return () => {
-      window.removeEventListener('resize', handleResize)
-      if (resetTimeoutRef.current !== null) {
-        window.clearTimeout(resetTimeoutRef.current)
+      if (resetTimeoutRef.current) {
+        clearTimeout(resetTimeoutRef.current)
       }
     }
   }, [])
-
-  // Enhanced error handling helper
-  const handleError = useCallback((error: any, type: ErrorType) => {
-    setErrorType(type)
-    setIsLoading(false)
-    startListeningPromiseRef.current = null
-    
-    const errorMessages: Record<ErrorType, string> = {
-      permission: "Tidak dapat mengakses mikrofon. Periksa perizinan browser.",
-      network: "Masalah koneksi jaringan. Coba lagi nanti.",
-      timeout: "Waktu tunggu habis. Silakan coba lagi.",
-      'not-supported': "Browser tidak mendukung speech recognition.",
-      unknown: "Terjadi kesalahan tidak dikenal. Silakan coba lagi."
-    }
-    
-    setMessage(errorMessages[type])
-    console.error(`Speech recognition error (${type}):`, error)
-  }, [])
-
-  const startListening = useCallback(() => {
-    if (listening || startListeningPromiseRef.current || isLoading) {
-      return
-    }
-
-    setIsLoading(true)
-    setErrorType(null)
-    setMessage("Memulai speech recognition...")
-
-    const timeoutId = setTimeout(() => {
-      handleError(new Error('Timeout'), 'timeout')
-    }, 10000) // 10 second timeout
-
-    const startPromise = SpeechRecognition.startListening({
-      continuous: true,
-      language: language,
-    })
-      .then(() => {
-        clearTimeout(timeoutId)
-        setIsLoading(false)
-        setMessage("Speech recognition aktif. Ucapkan nama buah!")
-      })
-      .catch((error) => {
-        clearTimeout(timeoutId)
-        // Determine error type based on error message/type
-        if (error.message?.includes('permission') || error.name === 'NotAllowedError') {
-          handleError(error, 'permission')
-        } else if (error.message?.includes('network') || error.name === 'NetworkError') {
-          handleError(error, 'network')
-        } else if (error.name === 'NotSupportedError') {
-          handleError(error, 'not-supported')
-        } else {
-          handleError(error, 'unknown')
-        }
-      })
-      .finally(() => {
-        startListeningPromiseRef.current = null
-      })
-
-    startListeningPromiseRef.current = startPromise
-  }, [listening, isLoading, language, handleError])
-
-  const stopListening = useCallback(async () => {
-    const pendingStart = startListeningPromiseRef.current
-
-    if (pendingStart) {
-      try {
-        await pendingStart
-      } catch (error) {
-        console.warn('Error waiting for pending start:', error)
-      }
-    }
-
-    startListeningPromiseRef.current = null
-    setIsLoading(false)
-
-    try {
-      await SpeechRecognition.stopListening()
-      setMessage("Speech recognition dihentikan.")
-    } catch (error) {
-      console.warn('Error stopping speech recognition:', error)
-    }
-  }, [])
-
-  const handleStopListening = useCallback(() => {
-    stopListening().catch(error => {
-      console.error('Error in handleStopListening:', error)
-    })
-  }, [stopListening])
 
   const commands = [
     {
@@ -139,32 +47,33 @@ function PlayGameFruits(props: PlayGameFruitsProps): ReactElement {
           return
         }
 
-        setSeIndex(matchedIndex)
-        setMessage(`Best matching command: ${command}`)
+        setSelectedIndex(matchedIndex)
+        setBestMatchMessage(`Best matching command: ${command}`)
 
-        props.setDataF((prev) =>
+        props.setDataFruits((prev) =>
           prev.map((item, index) => ({
             ...item,
             seleksi: index === matchedIndex,
           }))
         )
 
-        if (resetTimeoutRef.current !== null) {
-          window.clearTimeout(resetTimeoutRef.current)
+        if (resetTimeoutRef.current) {
+          clearTimeout(resetTimeoutRef.current)
         }
 
         resetTimeoutRef.current = window.setTimeout(() => {
-          setSeIndex(null)
-          props.setDataF((prev) =>
+          setSelectedIndex(null)
+          setBestMatchMessage("")
+          props.setDataFruits((prev) =>
             prev.map((item) => ({
               ...item,
               seleksi: false,
             }))
           )
-        }, 1000)
+        }, SELECTION_RESET_TIMEOUT)
       },
       isFuzzyMatch: true,
-      fuzzyMatchingThreshold: 0.2,
+      fuzzyMatchingThreshold: FUZZY_MATCH_THRESHOLD,
       bestMatchOnly: true,
     },
   ]
@@ -175,9 +84,35 @@ function PlayGameFruits(props: PlayGameFruitsProps): ReactElement {
     browserSupportsSpeechRecognition,
     resetTranscript,
   } = useSpeechRecognition({ commands })
+  
+  const { 
+    isLoading, 
+    errorType, 
+    message, 
+    startListening, 
+    stopListening 
+  } = useSpeechRecognitionManager(listening, language)
+
+  const handleStopListening = useCallback(() => {
+    // stopListening handles errors internally and returns a promise
+    stopListening().catch((error: Error) => {
+      console.error('Error in handleStopListening:', error)
+    })
+  }, [stopListening])
 
   if (!browserSupportsSpeechRecognition) {
-    return <div>Harus Menggunakan Browser Google Chrome</div>
+    return (
+      <div style={{
+        padding: '20px',
+        margin: '20px',
+        backgroundColor: '#fff3cd',
+        border: '1px solid #ffc107',
+        borderRadius: '4px',
+        color: '#856404'
+      }}>
+        {ERROR_MESSAGES['browser-not-supported']}
+      </div>
+    )
   }
 
   return (
@@ -186,40 +121,70 @@ function PlayGameFruits(props: PlayGameFruitsProps): ReactElement {
         {props.dataFruits.map((item: typeDataFruits, index: number) => (
           <div
             key={index}
-            className={`boxItem ${seIndex === index ? "boxBorder" : ""}`}
+            className={`boxItem ${selectedIndex === index ? "boxBorder" : ""}`}
           >
             <img
               src={item.gambar}
+              alt={item.nama}
               style={{ width: "100px", height: "100px" }}
+              onError={(e) => {
+                console.error(`Failed to load image for ${item.nama}`)
+                e.currentTarget.style.display = 'none'
+              }}
             />
             <h4>{item.nama}</h4>
           </div>
         ))}
       </div>
+      
       <div>
-        <p>Microphone: {listening ? "on" : "off"}</p>
-        <button onClick={() => resetTranscript()}>Reset Transcript</button>
+        <p>Microphone: {listening ? UI_MESSAGES.microphone_on : UI_MESSAGES.microphone_off}</p>
+        
+        <button 
+          onClick={() => resetTranscript()}
+          disabled={isLoading}
+        >
+          {BUTTON_LABELS.reset_transcript}
+        </button>
         {"  "}
-        {window.innerWidth <= 600 ? (
+        
+        {isMobile ? (
           <button
             onTouchStart={startListening}
             onTouchEnd={handleStopListening}
             onMouseUp={handleStopListening}
             onTouchCancel={handleStopListening}
+            disabled={isLoading}
           >
-            Hold to talk
+            {isLoading ? 'Loading...' : BUTTON_LABELS.hold_to_talk}
           </button>
         ) : (
           <button
             onMouseDown={startListening}
             onMouseUp={handleStopListening}
             onMouseLeave={handleStopListening}
+            disabled={isLoading}
           >
-            Hold to talk
+            {isLoading ? 'Loading...' : BUTTON_LABELS.hold_to_talk}
           </button>
         )}
-        <p>{transcript}</p>
-        <p>{message}</p>
+        
+        {transcript && <p>Transcript: {transcript}</p>}
+        
+        {message && (
+          <p style={{ 
+            color: errorType ? '#c92a2a' : '#2e7d32',
+            fontWeight: errorType ? 'bold' : 'normal'
+          }}>
+            {message}
+          </p>
+        )}
+        
+        {bestMatchMessage && (
+          <p style={{ color: '#1976d2' }}>
+            {bestMatchMessage}
+          </p>
+        )}
       </div>
     </div>
   )

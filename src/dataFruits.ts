@@ -2,7 +2,7 @@ import {
   apelSvg,
   blueberrySvg,
   pisangSvg,
-  stoberSvg,
+  stroberiSvg,
   terongSvg,
 } from "./assets"
 
@@ -30,7 +30,7 @@ export const dataFruits: typeDataFruits[] = [
   },
   {
     nama: "stroberi",
-    gambar: stoberSvg,
+    gambar: stroberiSvg,
     seleksi: false,
   },
   {
