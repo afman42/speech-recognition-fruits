@@ -19,7 +19,7 @@ export const dataFruits: typeDataFruits[] = [
     seleksi: false,
   },
   {
-    nama: "bluberry",
+    nama: "blueberry",
     gambar: blueberrySvg,
     seleksi: false,
   },

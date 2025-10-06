@@ -1,63 +1,131 @@
 import type { typeDataFruits } from "../dataFruits"
-import React, { useState, ReactElement, useRef, useEffect } from "react"
+import React, { useState, ReactElement, useRef, useEffect, useCallback } from "react"
 import SpeechRecognition, {
   useSpeechRecognition,
 } from "react-speech-recognition"
 
-function PlayGameFruits(props: {
+type ErrorType = 'permission' | 'network' | 'timeout' | 'not-supported' | 'unknown'
+
+interface PlayGameFruitsProps {
   dataFruits: typeDataFruits[]
   setDataF: React.Dispatch<React.SetStateAction<typeDataFruits[]>>
-}): ReactElement {
+  language?: string
+}
+
+function PlayGameFruits(props: PlayGameFruitsProps): ReactElement {
   const [message, setMessage] = useState<string>("")
+  const [errorType, setErrorType] = useState<ErrorType | null>(null)
+  const [isLoading, setIsLoading] = useState<boolean>(false)
   const [seIndex, setSeIndex] = useState<number | null>(null)
+  const [isMobile, setIsMobile] = useState<boolean>(false)
   const resetTimeoutRef = useRef<number | null>(null)
   const startListeningPromiseRef = useRef<Promise<void> | null>(null)
+  const { language = "id-ID" } = props
 
+  // Handle window resize for mobile detection
   useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 600)
+    }
+    
+    handleResize() // Set initial value
+    window.addEventListener('resize', handleResize)
+    
     return () => {
+      window.removeEventListener('resize', handleResize)
       if (resetTimeoutRef.current !== null) {
         window.clearTimeout(resetTimeoutRef.current)
       }
     }
   }, [])
 
-  const startListening = () => {
-    if (listening || startListeningPromiseRef.current) {
+  // Enhanced error handling helper
+  const handleError = useCallback((error: any, type: ErrorType) => {
+    setErrorType(type)
+    setIsLoading(false)
+    startListeningPromiseRef.current = null
+    
+    const errorMessages: Record<ErrorType, string> = {
+      permission: "Tidak dapat mengakses mikrofon. Periksa perizinan browser.",
+      network: "Masalah koneksi jaringan. Coba lagi nanti.",
+      timeout: "Waktu tunggu habis. Silakan coba lagi.",
+      'not-supported': "Browser tidak mendukung speech recognition.",
+      unknown: "Terjadi kesalahan tidak dikenal. Silakan coba lagi."
+    }
+    
+    setMessage(errorMessages[type])
+    console.error(`Speech recognition error (${type}):`, error)
+  }, [])
+
+  const startListening = useCallback(() => {
+    if (listening || startListeningPromiseRef.current || isLoading) {
       return
     }
 
+    setIsLoading(true)
+    setErrorType(null)
+    setMessage("Memulai speech recognition...")
+
+    const timeoutId = setTimeout(() => {
+      handleError(new Error('Timeout'), 'timeout')
+    }, 10000) // 10 second timeout
+
     const startPromise = SpeechRecognition.startListening({
       continuous: true,
-      language: "id-ID",
+      language: language,
     })
-      .catch(() => {
-        startListeningPromiseRef.current = null
-        setMessage("Tidak dapat memulai mikrofon. Periksa perizinan browser.")
+      .then(() => {
+        clearTimeout(timeoutId)
+        setIsLoading(false)
+        setMessage("Speech recognition aktif. Ucapkan nama buah!")
+      })
+      .catch((error) => {
+        clearTimeout(timeoutId)
+        // Determine error type based on error message/type
+        if (error.message?.includes('permission') || error.name === 'NotAllowedError') {
+          handleError(error, 'permission')
+        } else if (error.message?.includes('network') || error.name === 'NetworkError') {
+          handleError(error, 'network')
+        } else if (error.name === 'NotSupportedError') {
+          handleError(error, 'not-supported')
+        } else {
+          handleError(error, 'unknown')
+        }
       })
       .finally(() => {
         startListeningPromiseRef.current = null
       })
 
     startListeningPromiseRef.current = startPromise
-  }
-  const stopListening = async () => {
+  }, [listening, isLoading, language, handleError])
+
+  const stopListening = useCallback(async () => {
     const pendingStart = startListeningPromiseRef.current
 
     if (pendingStart) {
       try {
         await pendingStart
-      } catch {}
+      } catch (error) {
+        console.warn('Error waiting for pending start:', error)
+      }
     }
 
     startListeningPromiseRef.current = null
+    setIsLoading(false)
 
     try {
       await SpeechRecognition.stopListening()
-    } catch {}
-  }
-  const handleStopListening = () => {
-    void stopListening()
-  }
+      setMessage("Speech recognition dihentikan.")
+    } catch (error) {
+      console.warn('Error stopping speech recognition:', error)
+    }
+  }, [])
+
+  const handleStopListening = useCallback(() => {
+    stopListening().catch(error => {
+      console.error('Error in handleStopListening:', error)
+    })
+  }, [stopListening])
 
   const commands = [
     {
