@@ -3,6 +3,8 @@ import React, { ReactElement, useRef, useCallback, useState, useEffect } from "r
 import { useSpeechRecognition } from "react-speech-recognition"
 import { useSpeechRecognitionManager } from "../hooks/useSpeechRecognitionManager"
 import { useIsMobile } from "../hooks/useIsMobile"
+import FruitItem from "./FruitItem"
+import { soundManager } from "../utils/soundManager"
 import { 
   DEFAULT_LANGUAGE,
   SELECTION_RESET_TIMEOUT,
@@ -38,17 +40,22 @@ function PlayGameFruits(props: PlayGameFruitsProps): ReactElement {
   const commands = [
     {
       command: props.dataFruits.map((item: typeDataFruits) => item.nama),
-      callback: (command: string) => {
+      callback: (fruitName: string) => {
         const matchedIndex = props.dataFruits.findIndex(
-          (item: typeDataFruits) => command === item.nama
+          (item: typeDataFruits) => fruitName === item.nama
         )
 
         if (matchedIndex === -1) {
+          // Play incorrect sound when no match is found
+          soundManager.playIncorrectSound();
           return
         }
 
+        // Play correct sound when a match is found
+        soundManager.playCorrectSound();
+
         setSelectedIndex(matchedIndex)
-        setBestMatchMessage(`Best matching command: ${command}`)
+        setBestMatchMessage(`Best matching command: ${fruitName}`)
 
         props.setDataFruits((prev) =>
           prev.map((item, index) => ({
@@ -119,30 +126,22 @@ function PlayGameFruits(props: PlayGameFruitsProps): ReactElement {
     <div>
       <div className="boxRow">
         {props.dataFruits.map((item: typeDataFruits, index: number) => (
-          <div
+          <FruitItem
             key={index}
-            className={`boxItem ${selectedIndex === index ? "boxBorder" : ""}`}
-          >
-            <img
-              src={item.gambar}
-              alt={item.nama}
-              style={{ width: "100px", height: "100px" }}
-              onError={(e) => {
-                console.error(`Failed to load image for ${item.nama}`)
-                e.currentTarget.style.display = 'none'
-              }}
-            />
-            <h4>{item.nama}</h4>
-          </div>
+            item={item}
+            index={index}
+            isSelected={selectedIndex === index}
+          />
         ))}
       </div>
       
       <div>
-        <p>Microphone: {listening ? UI_MESSAGES.microphone_on : UI_MESSAGES.microphone_off}</p>
+        <p aria-live="polite">Microphone: {listening ? UI_MESSAGES.microphone_on : UI_MESSAGES.microphone_off}</p>
         
         <button 
           onClick={() => resetTranscript()}
           disabled={isLoading}
+          aria-label={BUTTON_LABELS.reset_transcript}
         >
           {BUTTON_LABELS.reset_transcript}
         </button>
@@ -155,6 +154,8 @@ function PlayGameFruits(props: PlayGameFruitsProps): ReactElement {
             onMouseUp={handleStopListening}
             onTouchCancel={handleStopListening}
             disabled={isLoading}
+            aria-label={isLoading ? 'Loading' : BUTTON_LABELS.hold_to_talk}
+            aria-pressed={listening}
           >
             {isLoading ? 'Loading...' : BUTTON_LABELS.hold_to_talk}
           </button>
@@ -164,24 +165,27 @@ function PlayGameFruits(props: PlayGameFruitsProps): ReactElement {
             onMouseUp={handleStopListening}
             onMouseLeave={handleStopListening}
             disabled={isLoading}
+            aria-label={isLoading ? 'Loading' : BUTTON_LABELS.hold_to_talk}
+            aria-pressed={listening}
           >
             {isLoading ? 'Loading...' : BUTTON_LABELS.hold_to_talk}
           </button>
         )}
         
-        {transcript && <p>Transcript: {transcript}</p>}
+        {transcript && <p aria-live="polite">Transcript: {transcript}</p>}
         
         {message && (
           <p style={{ 
             color: errorType ? '#c92a2a' : '#2e7d32',
             fontWeight: errorType ? 'bold' : 'normal'
-          }}>
+          }}
+          aria-live="assertive">
             {message}
           </p>
         )}
         
         {bestMatchMessage && (
-          <p style={{ color: '#1976d2' }}>
+          <p style={{ color: '#1976d2' }} aria-live="polite">
             {bestMatchMessage}
           </p>
         )}
