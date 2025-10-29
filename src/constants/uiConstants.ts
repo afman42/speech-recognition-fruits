@@ -20,3 +20,10 @@ export const UI_CONSTANTS = {
     TONE_DURATION: 0.3 // seconds
   }
 } as const;
+
+// Extend the window interface to properly type webkitAudioContext
+declare global {
+  interface Window {
+    webkitAudioContext: typeof AudioContext;
+  }
+}

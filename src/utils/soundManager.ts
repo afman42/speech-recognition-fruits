@@ -3,9 +3,25 @@ import { UI_CONSTANTS } from "../constants/uiConstants";
 // Sound utility for speech recognition feedback
 export class SoundManager {
   private isMuted: boolean = false;
+  private audioContext: AudioContext | null = null;
 
   constructor() {
-    // Initialize without pre-creating sounds since we'll generate them on demand
+    // Initialize without creating audio context until first use
+  }
+
+  private createAudioContext(): AudioContext | null {
+    if (typeof window === 'undefined') return null;
+    
+    try {
+      // Create audio context only if it doesn't exist or is closed
+      if (!this.audioContext || this.audioContext.state === 'closed') {
+        this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+      return this.audioContext;
+    } catch (error) {
+      console.error('Error creating audio context:', error);
+      return null;
+    }
   }
 
   public getMutedState(): boolean {
@@ -32,11 +48,20 @@ export class SoundManager {
 
   private playTone(frequency: number, duration: number): void {
     // Check if we're in a browser context
-    if (typeof window === 'undefined' || !window.AudioContext) return;
+    if (typeof window === 'undefined') return;
     
     try {
-      // Create audio context on demand to comply with autoplay policies
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const audioContext = this.createAudioContext();
+      if (!audioContext) {
+        console.error('Unable to create audio context');
+        return;
+      }
+
+      // Resume context if suspended (common with autoplay policy)
+      if (audioContext.state === 'suspended') {
+        audioContext.resume();
+      }
+
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
 
@@ -55,11 +80,12 @@ export class SoundManager {
       gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
       
       oscillator.stop(startTime + duration);
-      
-      // Resume context in case it's suspended (common with autoplay policy)
-      if (audioContext.state === 'suspended') {
-        audioContext.resume();
-      }
+
+      // Clean up after sound completes
+      oscillator.onended = () => {
+        oscillator.disconnect();
+        gainNode.disconnect();
+      };
     } catch (error) {
       console.error('Error playing sound:', error);
     }
@@ -71,6 +97,14 @@ export class SoundManager {
 
   public setMuted(muted: boolean): void {
     this.isMuted = muted;
+  }
+
+  // Clean up the audio context
+  public cleanup(): void {
+    if (this.audioContext && this.audioContext.state !== 'closed') {
+      this.audioContext.close();
+      this.audioContext = null;
+    }
   }
 }
 

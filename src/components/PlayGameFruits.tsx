@@ -28,12 +28,14 @@ function PlayGameFruits(props: PlayGameFruitsProps): ReactElement {
   
   const isMobile = useIsMobile()
   
-  // Cleanup effect for timeout
+  // Cleanup effect for timeout and audio context
   useEffect(() => {
     return () => {
       if (resetTimeoutRef.current) {
         clearTimeout(resetTimeoutRef.current)
       }
+      // Clean up audio context when component unmounts
+      soundManager.cleanup();
     }
   }, [])
 
@@ -64,10 +66,12 @@ function PlayGameFruits(props: PlayGameFruitsProps): ReactElement {
           }))
         )
 
+        // Clear any existing timeout to prevent conflicts
         if (resetTimeoutRef.current) {
           clearTimeout(resetTimeoutRef.current)
         }
 
+        // Set new timeout to reset the selection
         resetTimeoutRef.current = window.setTimeout(() => {
           setSelectedIndex(null)
           setBestMatchMessage("")
@@ -202,7 +206,6 @@ function PlayGameFruits(props: PlayGameFruitsProps): ReactElement {
         >
           {soundManager.getMutedState() ? '🔇 Sound: Off' : '🔊 Sound: On'}
         </button>
-      </div>
       </div>
     </div>
   )

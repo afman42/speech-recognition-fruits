@@ -23,7 +23,8 @@ export const useSpeechRecognitionManager = (
   const [errorType, setErrorType] = useState<ErrorType | null>(null)
   const [isLoading, setIsLoading] = useState<boolean>(false)
   
-  const startListeningPromiseRef = useRef<Promise<void> | null>(null)
+  // Use a ref to track whether we're trying to start/stop to prevent race conditions
+  const isOperationPending = useRef(false)
   const timeoutRef = useRef<number | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
   
@@ -42,7 +43,7 @@ export const useSpeechRecognitionManager = (
   const handleError = useCallback((error: Error, type: ErrorType) => {
     setErrorType(type)
     setIsLoading(false)
-    startListeningPromiseRef.current = null
+    isOperationPending.current = false
     
     const errorMessage = ERROR_MESSAGES[type as keyof typeof ERROR_MESSAGES]
     setMessage(errorMessage)
@@ -51,10 +52,13 @@ export const useSpeechRecognitionManager = (
   
   const startListening = useCallback(() => {
     // Prevent multiple simultaneous starts
-    if (listening || startListeningPromiseRef.current || isLoading) {
+    if (listening || isOperationPending.current) {
       console.warn('Speech recognition already starting or active')
       return
     }
+    
+    // Set the operation as pending to prevent race conditions
+    isOperationPending.current = true
     
     // Cancel any previous abort controller
     if (abortControllerRef.current) {
@@ -71,11 +75,11 @@ export const useSpeechRecognitionManager = (
     timeoutRef.current = window.setTimeout(() => {
       if (!abortControllerRef.current?.signal.aborted) {
         handleError(new Error('Timeout'), ErrorType.TIMEOUT)
-        startListeningPromiseRef.current = null
+        isOperationPending.current = false
       }
     }, SPEECH_RECOGNITION_TIMEOUT)
     
-    const startPromise = SpeechRecognition.startListening({
+    SpeechRecognition.startListening({
       continuous: true,
       language: language,
     })
@@ -85,6 +89,7 @@ export const useSpeechRecognitionManager = (
             clearTimeout(timeoutRef.current)
           }
           setIsLoading(false)
+          isOperationPending.current = false
           setMessage(UI_MESSAGES.active)
         }
       })
@@ -107,16 +112,15 @@ export const useSpeechRecognitionManager = (
           }
           
           handleError(error, errorType)
+          isOperationPending.current = false
         }
       })
-      .finally(() => {
-        startListeningPromiseRef.current = null
-      })
-    
-    startListeningPromiseRef.current = startPromise
-  }, [listening, isLoading, language, handleError])
+  }, [listening, language, handleError])
   
   const stopListening = useCallback(async () => {
+    // Set the operation as pending to prevent race conditions
+    isOperationPending.current = true
+    
     // Abort any ongoing operations
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
@@ -128,18 +132,8 @@ export const useSpeechRecognitionManager = (
       timeoutRef.current = null
     }
     
-    const pendingStart = startListeningPromiseRef.current
-    
-    if (pendingStart) {
-      try {
-        await pendingStart
-      } catch (error) {
-        console.warn('Error waiting for pending start:', error)
-      }
-    }
-    
-    startListeningPromiseRef.current = null
     setIsLoading(false)
+    isOperationPending.current = false
     
     try {
       await SpeechRecognition.stopListening()
