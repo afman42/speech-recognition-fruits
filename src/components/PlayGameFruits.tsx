@@ -189,6 +189,20 @@ function PlayGameFruits(props: PlayGameFruitsProps): ReactElement {
             {bestMatchMessage}
           </p>
         )}
+        
+        <button
+          onClick={() => soundManager.toggleMute()}
+          aria-label={soundManager.getMutedState() ? 'Unmute sound' : 'Mute sound'}
+          style={{
+            marginTop: '10px',
+            padding: '5px 10px',
+            fontSize: '14px',
+            backgroundColor: soundManager.getMutedState() ? '#ff9800' : '#2196F3',
+          }}
+        >
+          {soundManager.getMutedState() ? '🔇 Sound: Off' : '🔊 Sound: On'}
+        </button>
+      </div>
       </div>
     </div>
   )
